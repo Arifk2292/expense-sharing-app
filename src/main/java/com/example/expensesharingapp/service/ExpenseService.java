@@ -1,6 +1,7 @@
 package com.example.expensesharingapp.service;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
@@ -11,4 +12,6 @@ import com.example.expensesharingapp.model.Expense;
 public interface ExpenseService {
     
 	public Expense addExpense(String description, BigDecimal amount, Long payerId, Long groupId, Map<Long, BigDecimal> splits);
+
+    List<Expense> findByGroupId(Long groupId);
 }

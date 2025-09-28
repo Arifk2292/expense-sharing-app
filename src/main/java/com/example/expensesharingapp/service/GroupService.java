@@ -22,4 +22,6 @@ public interface GroupService {
     public void deleteGroup(Long groupId);
 
     public boolean isUserMemberOfGroup(Long groupId, String email);
+
+	void removeMember(Long groupId, Long userId);
 }

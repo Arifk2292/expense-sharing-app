@@ -1,6 +1,7 @@
 package com.example.expensesharingapp.controller;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -17,8 +18,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.expensesharingapp.dto.AddMemberRequestDto;
 import com.example.expensesharingapp.dto.CreateGroupRequestDto;
+import com.example.expensesharingapp.model.Expense;
 import com.example.expensesharingapp.model.Group;
 import com.example.expensesharingapp.model.User;
+import com.example.expensesharingapp.service.ExpenseService;
 import com.example.expensesharingapp.service.GroupService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +34,9 @@ public class GroupController {
 
 	@Autowired
     private GroupService groupService;
+
+    @Autowired
+    private ExpenseService expenseService;
 
     @Operation(summary = "Create a new group")
     @ApiResponses(value = {
@@ -48,13 +54,42 @@ public class GroupController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Member added successfully"),
             @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden"),
             @ApiResponse(responseCode = "404", description = "Group or User not found")
     })
     @PostMapping("/{groupId}/members")
-    @PreAuthorize("hasPermission(#groupId, 'Group', 'isMember')")
+    @PreAuthorize("hasPermission(#groupId, 'Group', 'isAdmin')")
     public ResponseEntity<Group> addMember(@PathVariable Long groupId, @RequestBody AddMemberRequestDto request) {
         Group group = groupService.addMember(groupId, request.getUserId());
         return ResponseEntity.ok(group);
+    }
+
+    @Operation(summary = "Remove a member from a group")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Member removed successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden"),
+            @ApiResponse(responseCode = "404", description = "Group or User not found")
+    })
+    @DeleteMapping("/{groupId}/members/{userId}")
+    @PreAuthorize("hasPermission(#groupId, 'Group', 'isAdmin')")
+    public ResponseEntity<Void> removeMember(@PathVariable Long groupId, @PathVariable Long userId) {
+        groupService.removeMember(groupId, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Get all expenses for a group")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Expenses retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden"),
+            @ApiResponse(responseCode = "404", description = "Group not found")
+    })
+    @GetMapping("/{groupId}/expenses")
+    @PreAuthorize("hasPermission(#groupId, 'Group', 'isMember')")
+    public ResponseEntity<List<Expense>> getExpenses(@PathVariable Long groupId) {
+        List<Expense> expenses = expenseService.findByGroupId(groupId);
+        return ResponseEntity.ok(expenses);
     }
 
     @Operation(summary = "Get balances for a group")

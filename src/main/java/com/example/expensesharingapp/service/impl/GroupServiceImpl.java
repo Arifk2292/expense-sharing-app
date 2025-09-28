@@ -2,6 +2,7 @@ package com.example.expensesharingapp.service.impl;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -53,6 +54,33 @@ public class GroupServiceImpl implements GroupService{
         return groupRepository.save(group);
     }
 
+    @Override
+    @Transactional
+    public void removeMember(Long groupId, Long userId) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Group not found with id: " + groupId));
+        User userToRemove = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        if (group.getAdmin().equals(userToRemove)) {
+            throw new IllegalArgumentException("Admin cannot be removed from the group.");
+        }
+
+        if (!group.getMembers().contains(userToRemove)) {
+            throw new IllegalArgumentException("User is not a member of this group.");
+        }
+
+        Map<User, BigDecimal> balances = getBalances(groupId);
+        BigDecimal userBalance = balances.get(userToRemove);
+
+        if (userBalance.compareTo(BigDecimal.ZERO) != 0) {
+            throw new IllegalStateException("User has an unsettled balance and cannot be removed.");
+        }
+
+        group.getMembers().remove(userToRemove);
+        groupRepository.save(group);
+    }
+
     @Transactional(readOnly = true)
     @Override
     public Map<User, BigDecimal> getBalances(Long groupId) {
@@ -73,11 +101,16 @@ public class GroupServiceImpl implements GroupService{
             }
         }
 
-        for (Settlement settlement : settlementRepository.findByGroup(group)) {
+        List<Settlement> settlements = settlementRepository.findByGroup(group);
+        for (Settlement settlement : settlements) {
             User payer = settlement.getPayer();
             User receiver = settlement.getReceiver();
-            balances.put(payer, balances.get(payer).add(settlement.getAmount()));
-            balances.put(receiver, balances.get(receiver).subtract(settlement.getAmount()));
+            BigDecimal amount = settlement.getAmount();
+
+            // Payer's balance increases (they paid, so their debt decreases)
+            balances.put(payer, balances.get(payer).add(amount));
+            // Receiver's balance decreases (they received, so they are owed less)
+            balances.put(receiver, balances.get(receiver).subtract(amount));
         }
 
         return balances;
